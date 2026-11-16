@@ -4,7 +4,7 @@
 #include <math.h>
 #include <string.h>
 
-#define SUNS_SPRITE 24
+#define SUNS_SPRITE 36
 #define SUNS_SPRITE_W (2 * SUNS_SPRITE + 1)
 #define SUNS_MAIN_W 256
 #define SUNS_MAIN_H 64
@@ -30,9 +30,9 @@ namespace od
 
   // Three suns of different sizes, each on its own slow path.
   static const SunPath kPaths[3] = {
-      {150.0f, 95.0f, 14.0f, 2.0f, 0.00f, 5.5f, 60.0f},
-      {190.0f, 80.0f, 18.0f, 3.0f, 0.33f, 4.0f, -75.0f},
-      {235.0f, 105.0f, 11.0f, 2.0f, 0.66f, 3.0f, 45.0f},
+      {150.0f, 90.0f, 12.0f, 2.0f, 0.00f, 8.8f, 60.0f},
+      {190.0f, 78.0f, 15.0f, 3.0f, 0.33f, 6.4f, -75.0f},
+      {235.0f, 100.0f, 10.0f, 2.0f, 0.66f, 4.8f, 45.0f},
   };
 
   Suns::Suns()
@@ -77,6 +77,8 @@ namespace od
           continue;
         int k = j * SUNS_SPRITE_W + i;
         float d = mDist[k];
+        if (d > r * 4.0f)
+          continue; // nothing visible this far out
         float v;
         if (d <= r)
         {
