@@ -143,13 +143,17 @@ namespace od
     drawFloor(s, cx, cy, r);
   }
 
-  // 4x4 ordered-dither thresholds (0..1), used to get smooth gradients out of
-  // the display's 16 grey levels.
-  static const float kBayer4[16] = {
-      0.0f / 16, 8.0f / 16, 2.0f / 16, 10.0f / 16,
-      12.0f / 16, 4.0f / 16, 14.0f / 16, 6.0f / 16,
-      3.0f / 16, 11.0f / 16, 1.0f / 16, 9.0f / 16,
-      15.0f / 16, 7.0f / 16, 13.0f / 16, 5.0f / 16};
+  // 8x8 ordered-dither (Bayer) thresholds. The sub display is 1-bit (a pixel
+  // is either on or off), so brightness is shown by the density of lit pixels.
+  static const uint8_t kBayer8[64] = {
+      0, 32, 8, 40, 2, 34, 10, 42,
+      48, 16, 56, 24, 50, 18, 58, 26,
+      12, 44, 4, 36, 14, 46, 6, 38,
+      60, 28, 52, 20, 62, 30, 54, 22,
+      3, 35, 11, 43, 1, 33, 9, 41,
+      51, 19, 59, 27, 49, 17, 57, 25,
+      15, 47, 7, 39, 13, 45, 5, 37,
+      63, 31, 55, 23, 61, 29, 53, 21};
 
   void Suns::drawFloor(FrameBuffer &s, const float *cx, const float *cy,
                        const float *r)
@@ -204,7 +208,7 @@ namespace od
       float depth = (float)(SUNS_HORIZON - y) / SUNS_HORIZON; // 1 near, 0 far
       float spread = 7.0f + 16.0f * depth;
       // ambient light falling off towards the horizon
-      float ambient = 0.05f + 0.06f * depth;
+      float ambient = 0.015f + 0.035f * depth;
       for (int x = 0; x < SUNS_SUB_W; x++)
       {
         // main pool
@@ -230,23 +234,17 @@ namespace od
         v += ambient;
         if (v > 1.0f)
           v = 1.0f;
-        float level = v * WHITE;
-        int base = (int)level;
-        float frac = level - (float)base;
-        int color = base + (frac > kBayer4[(y & 3) * 4 + (x & 3)] ? 1 : 0);
-        if (color > WHITE)
-          color = WHITE;
-        if (color > 0)
-          s.pixel(color, x, y);
+        // lit if brighter than this pixel's dither threshold
+        float threshold = ((float)kBayer8[(y & 7) * 8 + (x & 7)] + 0.5f) / 64.0f;
+        if (v > threshold)
+          s.pixel(WHITE, x, y);
       }
     }
 
-    // horizon: a faint line with a little glow just above it
-    for (int x = 0; x < SUNS_SUB_W; x++)
+    // horizon: a dotted line
+    for (int x = 0; x < SUNS_SUB_W; x += 2)
     {
-      s.pixel(4, x, SUNS_HORIZON);
-      if ((x & 1) == 0)
-        s.pixel(1, x, SUNS_HORIZON + 1);
+      s.pixel(WHITE, x, SUNS_HORIZON);
     }
   }
 
