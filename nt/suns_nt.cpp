@@ -277,7 +277,10 @@ uintptr_t pluginEntry( _NT_selector selector, uint32_t data )
 	switch ( selector )
 	{
 	case kNT_selector_version:
-		return kNT_apiVersionCurrent;
+		// Only basic features are used (drawing, step, one parameter), so
+		// declare the oldest compatible API version. Every later API is
+		// backwards compatible with v4, so this loads on any v4+ firmware.
+		return kNT_apiVersion4;
 	case kNT_selector_numFactories:
 		return 1;
 	case kNT_selector_factoryInfo:
