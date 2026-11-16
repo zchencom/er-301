@@ -23,7 +23,7 @@ jobs:
       run: |
         sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt-get install -y swig python3 zip gcc-multilib libc6:i386 libstdc++6:i386 lib32z1
+        sudo apt-get install -y python3 zip gcc-multilib libc6:i386 libstdc++6:i386 lib32z1 libpcre2-dev bison automake autoconf
 
     - name: Cache TI Processor SDK
       id: cache-ti
@@ -49,6 +49,25 @@ jobs:
         timeout 20m ./ti-install.bin --mode unattended --prefix "$HOME/ti" < /dev/null || echo "installer exit code $?"
         ls "$HOME/ti"
         test -d "$HOME/ti/gcc-arm-none-eabi-4_9-2015q3"
+
+    - name: Cache SWIG 4.2.1
+      id: cache-swig
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/swig-4.2.1
+        key: swig-4.2.1-ubuntu-22.04
+
+    - name: Build SWIG 4.2.1 (stolmine expects it at ~/.local/swig-4.2.1)
+      if: steps.cache-swig.outputs.cache-hit != 'true'
+      run: |
+        wget -q -O swig.tar.gz https://github.com/swig/swig/archive/refs/tags/v4.2.1.tar.gz
+        tar xzf swig.tar.gz
+        cd swig-4.2.1
+        ./autogen.sh
+        ./configure --prefix="$HOME/.local/swig-4.2.1"
+        make -j"$(nproc)"
+        make install
+        "$HOME/.local/swig-4.2.1/bin/swig" -version
 
     - name: Get stolmine source at ${{ env.BASE_TAG }}
       run: |
