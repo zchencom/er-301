@@ -77,13 +77,12 @@ jobs:
         git clone --depth 1 --branch "$BASE_TAG" "$BASE_REPO" src
         cd src && git log -1 --format='%h %s'
 
-    - name: Add the sun screensaver
+    - name: Add the sun and suns screensavers
       run: |
         python3 ci/apply_sun.py src od/graphics/screensavers
         cd src
-        git -c user.name=ci -c user.email=ci@localhost commit -qam "Add sun screensaver"
-        git -c user.name=ci -c user.email=ci@localhost add od/graphics/screensavers/Sun.h od/graphics/screensavers/Sun.cpp
-        git -c user.name=ci -c user.email=ci@localhost commit -q --amend --no-edit
+        git add -A
+        git -c user.name=ci -c user.email=ci@localhost commit -qm "Add sun and suns screensavers"
         git tag "$OUR_TAG"
         git describe --match 'v*.*.*-*' --tags --abbrev=0
 
