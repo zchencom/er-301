@@ -1,9 +1,15 @@
-name: Build ER-301 firmware
+name: Build ER-301 firmware (stolmine + sun)
 
-# Runs automatically on every push (any branch), or manually from the Actions tab.
+# Builds the stolmine community firmware at a fixed release, with the "sun"
+# screensaver added. Runs on every push, or manually from the Actions tab.
 on:
   workflow_dispatch:
   push:
+
+env:
+  BASE_REPO: https://github.com/stolmine/er-301-stolmine.git
+  BASE_TAG: v0.7.0-stolmine.9.7.0
+  OUR_TAG: v0.7.0-stolmine.9.7.0-sun
 
 jobs:
   firmware:
@@ -12,8 +18,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0          # tags are needed to work out the firmware version
 
     - name: Install build dependencies
       run: |
@@ -34,28 +38,39 @@ jobs:
       run: |
         URL=https://software-dl.ti.com/processor-sdk-rtos/esd/AM335X/04_01_00_06/exports/ti-processor-sdk-rtos-am335x-evm-04.01.00.06-Linux-x86-Install.bin
         wget --progress=dot:giga -O ti-install.bin "$URL"
-        ls -la ti-install.bin
-        file ti-install.bin
         chmod +x ti-install.bin
-
-    - name: Show installer options
-      if: steps.cache-ti.outputs.cache-hit != 'true'
-      timeout-minutes: 3
-      run: ./ti-install.bin --help < /dev/null || true
 
     - name: Install TI Processor SDK (unattended)
       if: steps.cache-ti.outputs.cache-hit != 'true'
       timeout-minutes: 25
       run: |
+        # The installer hangs at the very end (post-install step) once all
+        # components are in place, so it is cut off by a timeout.
         timeout 20m ./ti-install.bin --mode unattended --prefix "$HOME/ti" < /dev/null || echo "installer exit code $?"
-        echo "Installed:"; ls "$HOME/ti" || true
+        ls "$HOME/ti"
         test -d "$HOME/ti/gcc-arm-none-eabi-4_9-2015q3"
 
+    - name: Get stolmine source at ${{ env.BASE_TAG }}
+      run: |
+        git clone --depth 1 --branch "$BASE_TAG" "$BASE_REPO" src
+        cd src && git log -1 --format='%h %s'
+
+    - name: Add the sun screensaver
+      run: |
+        python3 ci/apply_sun.py src od/graphics/screensavers
+        cd src
+        git -c user.name=ci -c user.email=ci@localhost commit -qam "Add sun screensaver"
+        git -c user.name=ci -c user.email=ci@localhost add od/graphics/screensavers/Sun.h od/graphics/screensavers/Sun.cpp
+        git -c user.name=ci -c user.email=ci@localhost commit -q --amend --no-edit
+        git tag "$OUR_TAG"
+        git describe --match 'v*.*.*-*' --tags --abbrev=0
+
     - name: Build firmware
+      working-directory: src
       run: make firmware ARCH=am335x
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
-        name: er-301-firmware-sun
-        path: release/am335x/er-301-v*.zip
+        name: er-301-firmware-stolmine-9.7.0-sun
+        path: src/release/am335x/er-301-v*.zip
