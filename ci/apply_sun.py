@@ -6,7 +6,7 @@ import os, shutil, sys
 
 src, files = sys.argv[1], sys.argv[2]
 ss = os.path.join(src, 'od/graphics/screensavers')
-for f in ('Sun.h', 'Sun.cpp'):
+for f in ('Sun.h', 'Sun.cpp', 'Suns.h', 'Suns.cpp', 'NameBitmap.h'):
     shutil.copy(os.path.join(files, f), os.path.join(ss, f))
 
 def edit(path, pairs):
@@ -23,7 +23,7 @@ def edit(path, pairs):
 
 edit('od/UIThread.cpp', [
     ('#include <od/graphics/screensavers/Bubbles.h>\n',
-     '#include <od/graphics/screensavers/Bubbles.h>\n#include <od/graphics/screensavers/Sun.h>\n'),
+     '#include <od/graphics/screensavers/Bubbles.h>\n#include <od/graphics/screensavers/Sun.h>\n#include <od/graphics/screensavers/Suns.h>\n'),
     ('"perlin", "voronoi"};', '"perlin", "voronoi", "sun"};'),
     ('''    else if (tmp == "doom")
     {
@@ -37,9 +37,13 @@ edit('od/UIThread.cpp', [
     {
       local->screenSaver = new Sun();
     }
+    else if (tmp == "suns")
+    {
+      local->screenSaver = new Suns();
+    }
 '''),
 ])
 edit('xroot/Settings/init.lua', [
-    ('      "doom",\n      "cycle"\n', '      "doom",\n      "sun",\n      "cycle"\n'),
+    ('      "doom",\n      "cycle"\n', '      "doom",\n      "sun",\n      "suns",\n      "cycle"\n'),
 ])
-print('sun screensaver applied')
+print('sun + suns screensavers applied')

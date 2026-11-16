@@ -9,7 +9,10 @@ on:
 env:
   BASE_REPO: https://github.com/stolmine/er-301-stolmine.git
   BASE_TAG: v0.7.0-stolmine.9.7.0
-  OUR_TAG: v0.7.0-stolmine.9.7.0-sun
+  OUR_TAG: v0.7.0-stolmine.9.7.0-sun2
+
+permissions:
+  contents: write   # lets the workflow publish the firmware as a GitHub release
 
 jobs:
   firmware:
@@ -93,3 +96,18 @@ jobs:
       with:
         name: er-301-firmware-stolmine-9.7.0-sun
         path: src/release/am335x/er-301-v*.zip
+
+    - name: Publish firmware as a release (direct download, no extra zip layer)
+      if: github.ref == 'refs/heads/sun-screensaver'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        FILE=$(ls src/release/am335x/er-301-v*.zip)
+        REL="firmware-${OUR_TAG#v}"
+        if gh release view "$REL" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          gh release upload "$REL" "$FILE" --clobber -R "$GITHUB_REPOSITORY"
+        else
+          gh release create "$REL" "$FILE" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "ER-301 stolmine 9.7.0 + sun / suns screensavers" \
+            --notes "stolmine 9.7.0 (2fbb7ce) with two extra screensavers: sun, suns. Download the .zip below and put it, unopened, into the front card's firmware folder."
+        fi
