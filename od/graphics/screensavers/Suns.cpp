@@ -1,5 +1,4 @@
 #include <od/graphics/screensavers/Suns.h>
-#include <od/graphics/screensavers/NameBitmap.h>
 #include <od/extras/Random.h>
 #include <hal/constants.h>
 #include <math.h>
@@ -13,9 +12,8 @@
 #define SUNS_SUB_H 64
 #define SUNS_TWO_PI 6.28318530718f
 
-// Scrolling name on the sub display.
-#define SUNS_SCROLL_SPEED 16.0f // pixels per second
-#define SUNS_SCROLL_GAP 48      // empty pixels between repeats
+// Floor on the sub display (y = 0 is the bottom of the screen).
+#define SUNS_HORIZON 40 // y of the horizon line
 
 namespace od
 {
@@ -120,15 +118,16 @@ namespace od
 
     // --- main display: three suns ---
     memset(mCanvas.data(), 0, mCanvas.size());
+    float cx[3], cy[3], r[3];
     for (int n = 0; n < 3; n++)
     {
       const SunPath &p = kPaths[n];
       float a = SUNS_TWO_PI * (t / p.period + p.offset);
-      float cx = 128.0f + p.ax * sinf(a);
-      float cy = 32.0f + p.ay * sinf(p.yRatio * a);
-      float r = p.radius * (1.0f + 0.12f * sinf(SUNS_TWO_PI * t / (7.0f + n)));
+      cx[n] = 128.0f + p.ax * sinf(a);
+      cy[n] = 32.0f + p.ay * sinf(p.yRatio * a);
+      r[n] = p.radius * (1.0f + 0.12f * sinf(SUNS_TWO_PI * t / (7.0f + n)));
       float phase = SUNS_TWO_PI * t / p.rayPeriod;
-      drawSun(cx, cy, r, phase);
+      drawSun(cx[n], cy[n], r[n], phase);
     }
     for (int y = 0; y < SUNS_MAIN_H; y++)
     {
@@ -140,41 +139,114 @@ namespace od
       }
     }
 
-    // --- sub display: the name scrolls from right to left, forever ---
-    const int loop = NAME_BITMAP_W + SUNS_SCROLL_GAP;
-    int shift = ((int)(t * SUNS_SCROLL_SPEED)) % loop;
-    // y = 0 is the bottom of the display; bitmap row 0 is the top of the text
-    int top = (SUNS_SUB_H + NAME_BITMAP_H) / 2 - 1;
-    for (int x0 = SUNS_SUB_W - shift; x0 < SUNS_SUB_W; x0 += loop)
+    // --- sub display: horizon + one merged pool of light ---
+    drawFloor(s, cx, cy, r);
+  }
+
+  // 4x4 ordered-dither thresholds (0..1), used to get smooth gradients out of
+  // the display's 16 grey levels.
+  static const float kBayer4[16] = {
+      0.0f / 16, 8.0f / 16, 2.0f / 16, 10.0f / 16,
+      12.0f / 16, 4.0f / 16, 14.0f / 16, 6.0f / 16,
+      3.0f / 16, 11.0f / 16, 1.0f / 16, 9.0f / 16,
+      15.0f / 16, 7.0f / 16, 13.0f / 16, 5.0f / 16};
+
+  void Suns::drawFloor(FrameBuffer &s, const float *cx, const float *cy,
+                       const float *r)
+  {
+    // Each sun throws a soft patch of light through an imagined opening onto
+    // the floor. The patch moves opposite to the sun (light comes "through"
+    // the screen), lands closer to the viewer when the sun is higher, and is
+    // brighter for a bigger sun. The three patches are added together, so they
+    // merge into one pool of light whose shape keeps changing.
+    // One pool of light: centred on the brightness-weighted centre of the three
+    // suns (mirrored, as if the light comes through the screen), wider when the
+    // suns are spread apart, closer to the viewer when they are high. Each sun
+    // only adds a faint lobe inside the pool, so the three read as one.
+    float w[3];
+    float total = 0.0f, mx = 0.0f, my = 0.0f;
+    for (int n = 0; n < 3; n++)
     {
-      for (int r = 0; r < NAME_BITMAP_H; r++)
+      w[n] = r[n] * r[n];
+      total += w[n];
+      mx += w[n] * cx[n];
+      my += w[n] * cy[n];
+    }
+    mx /= total;
+    my /= total;
+    float varx = 0.0f;
+    for (int n = 0; n < 3; n++)
+    {
+      float d = cx[n] - mx;
+      varx += w[n] * d * d;
+    }
+    float spreadSuns = sqrtf(varx / total); // 0..~90 px on the main display
+
+    float pcx = 64.0f - 0.42f * (mx - 128.0f);
+    float pcy = 6.0f + (52.0f - my) * 0.55f;
+    if (pcy < 4.0f)
+      pcy = 4.0f;
+    if (pcy > SUNS_HORIZON - 9.0f)
+      pcy = SUNS_HORIZON - 9.0f;
+    float poolW = 1.0f + spreadSuns / 60.0f; // wider pool for spread-out suns
+
+    float px[3], py[3];
+    for (int n = 0; n < 3; n++)
+    {
+      // lobes pulled most of the way into the pool's centre
+      px[n] = pcx + 0.22f * (-0.42f * (cx[n] - mx));
+      py[n] = pcy + 0.15f * (my - cy[n]) * 0.55f;
+    }
+
+    for (int y = 0; y < SUNS_HORIZON; y++)
+    {
+      // perspective: things near the viewer (small y) are wider
+      float depth = (float)(SUNS_HORIZON - y) / SUNS_HORIZON; // 1 near, 0 far
+      float spread = 7.0f + 16.0f * depth;
+      // ambient light falling off towards the horizon
+      float ambient = 0.05f + 0.06f * depth;
+      for (int x = 0; x < SUNS_SUB_W; x++)
       {
-        int y = top - r;
-        const uint8_t *row = &NAME_BITMAP[r * NAME_BITMAP_W];
-        for (int c = 0; c < NAME_BITMAP_W; c++)
+        // main pool
+        float dx = ((float)x - pcx) / (spread * poolW);
+        float dy = ((float)y - pcy) / (5.0f + 6.0f * depth);
+        float e = dx * dx + dy * dy;
+        float v = 0.0f;
+        if (e < 9.0f)
         {
-          int x = x0 + c;
-          if (x < 0 || x >= SUNS_SUB_W || row[c] == 0)
-            continue;
-          s.pixel(row[c], x, y);
+          v = 0.92f * expf(-e * e * 0.35f);
         }
+        // faint lobes from the individual suns, inside the pool
+        for (int n = 0; n < 3; n++)
+        {
+          float lx = ((float)x - px[n]) / (spread * 0.55f);
+          float ly = ((float)y - py[n]) / (4.0f + 4.0f * depth);
+          float le = lx * lx + ly * ly;
+          if (le < 6.0f)
+          {
+            v += 0.18f * (w[n] / total) * 3.0f * expf(-le);
+          }
+        }
+        v += ambient;
+        if (v > 1.0f)
+          v = 1.0f;
+        float level = v * WHITE;
+        int base = (int)level;
+        float frac = level - (float)base;
+        int color = base + (frac > kBayer4[(y & 3) * 4 + (x & 3)] ? 1 : 0);
+        if (color > WHITE)
+          color = WHITE;
+        if (color > 0)
+          s.pixel(color, x, y);
       }
     }
-    // the copy entering from the left edge, so the loop is seamless
-    for (int x0 = SUNS_SUB_W - shift - loop; x0 + NAME_BITMAP_W > 0; x0 -= loop)
+
+    // horizon: a faint line with a little glow just above it
+    for (int x = 0; x < SUNS_SUB_W; x++)
     {
-      for (int r = 0; r < NAME_BITMAP_H; r++)
-      {
-        int y = top - r;
-        const uint8_t *row = &NAME_BITMAP[r * NAME_BITMAP_W];
-        for (int c = 0; c < NAME_BITMAP_W; c++)
-        {
-          int x = x0 + c;
-          if (x < 0 || x >= SUNS_SUB_W || row[c] == 0)
-            continue;
-          s.pixel(row[c], x, y);
-        }
-      }
+      s.pixel(4, x, SUNS_HORIZON);
+      if ((x & 1) == 0)
+        s.pixel(1, x, SUNS_HORIZON + 1);
     }
   }
 

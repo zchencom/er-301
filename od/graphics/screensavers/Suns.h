@@ -9,7 +9,9 @@ namespace od
 
   // Three small suns wandering across the main display on their own slow
   // Lissajous paths, each with its own size and ray rotation. The sub display
-  // scrolls a name, rendered as a 4-bit bitmap (see NameBitmap.h).
+  // shows a horizon and a single pool of light on the floor: the three suns'
+  // light merged into one soft, perspective-correct patch that morphs as the
+  // suns move.
   class Suns : public ScreenSaver
   {
   public:
@@ -22,6 +24,8 @@ namespace od
 
   private:
     void drawSun(float cx, float cy, float r, float phase);
+    void drawFloor(FrameBuffer &s, const float *cx, const float *cy,
+                   const float *r);
 
     float t = 0.0f;
     std::vector<float> mDist;     // sprite offset -> distance from centre

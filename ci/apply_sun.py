@@ -6,7 +6,7 @@ import os, shutil, sys
 
 src, files = sys.argv[1], sys.argv[2]
 ss = os.path.join(src, 'od/graphics/screensavers')
-for f in ('Sun.h', 'Sun.cpp', 'Suns.h', 'Suns.cpp', 'NameBitmap.h'):
+for f in ('Sun.h', 'Sun.cpp', 'Suns.h', 'Suns.cpp'):
     shutil.copy(os.path.join(files, f), os.path.join(ss, f))
 
 def edit(path, pairs):
@@ -44,6 +44,9 @@ edit('od/UIThread.cpp', [
 '''),
 ])
 edit('xroot/Settings/init.lua', [
+    # screensaver timeout: add a 10 second option
+    ('    choices = {\n      "1 min",\n', '    choices = {\n      "10 secs",\n      "1 min",\n'),
+    ('      if value == "1 min" then\n', '      if value == "10 secs" then\n        app.UIThread.setScreenSaverTime(10)\n      elseif value == "1 min" then\n'),
     ('      "doom",\n      "cycle"\n', '      "doom",\n      "sun",\n      "suns",\n      "cycle"\n'),
 ])
-print('sun + suns screensavers applied')
+print('sun + suns screensavers and 10 s timeout applied')

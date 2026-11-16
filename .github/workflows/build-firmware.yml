@@ -9,7 +9,7 @@ on:
 env:
   BASE_REPO: https://github.com/stolmine/er-301-stolmine.git
   BASE_TAG: v0.7.0-stolmine.9.7.0
-  OUR_TAG: v0.7.0-stolmine.9.7.0-sun2
+  OUR_TAG: v0.7.0-stolmine.9.7.0-sun3
 
 permissions:
   contents: write   # lets the workflow publish the firmware as a GitHub release
@@ -108,5 +108,5 @@ jobs:
         else
           gh release create "$REL" "$FILE" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "ER-301 stolmine 9.7.0 + sun / suns screensavers" \
-            --notes "stolmine 9.7.0 (2fbb7ce) with two extra screensavers: sun, suns. Download the .zip below and put it, unopened, into the front card's firmware folder."
+            --notes "stolmine 9.7.0 (2fbb7ce) with two extra screensavers (sun, suns) and a 10 second screensaver timeout option. Download the .zip below and put it, unopened, into the front card's firmware folder."
         fi
