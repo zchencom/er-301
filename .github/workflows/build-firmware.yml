@@ -1,0 +1,47 @@
+name: Build ER-301 firmware
+
+# Runs automatically on every push (any branch), or manually from the Actions tab.
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0          # tags are needed to work out the firmware version
+
+    - name: Install build dependencies
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y swig python3 zip gcc-multilib libc6:i386 libstdc++6:i386 lib32z1
+
+    - name: Cache TI Processor SDK
+      id: cache-ti
+      uses: actions/cache@v4
+      with:
+        path: ~/ti
+        key: ti-processor-sdk-rtos-am335x-04.01.00.06
+
+    - name: Download and install TI Processor SDK RTOS AM335x 04.01.00.06
+      if: steps.cache-ti.outputs.cache-hit != 'true'
+      run: |
+        URL=https://software-dl.ti.com/processor-sdk-rtos/esd/AM335X/04_01_00_06/exports/ti-processor-sdk-rtos-am335x-evm-04.01.00.06-Linux-x86-Install.bin
+        wget --progress=dot:giga -O ti-install.bin "$URL"
+        chmod +x ti-install.bin
+        ./ti-install.bin --mode unattended --prefix "$HOME/ti" || true
+        echo "Installed:"; ls "$HOME/ti"
+        test -d "$HOME/ti/gcc-arm-none-eabi-4_9-2015q3"
+
+    - name: Build firmware
+      run: make firmware ARCH=am335x
+
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: er-301-firmware-sun
+        path: release/am335x/er-301-v*.zip

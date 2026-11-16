@@ -4,6 +4,7 @@
 #include <od/graphics/screensavers/Blank.h>
 #include <od/graphics/screensavers/Lines.h>
 #include <od/graphics/screensavers/Bubbles.h>
+#include <od/graphics/screensavers/Sun.h>
 #include <od/extras/Profiler.h>
 #include <od/ui/ChannelLEDs.h>
 #include <od/AudioThread.h>
@@ -90,6 +91,10 @@ namespace od
     else if (tmp == "grid")
     {
       local->screenSaver = new Lines(true);
+    }
+    else if (tmp == "sun")
+    {
+      local->screenSaver = new Sun();
     }
     else
     {

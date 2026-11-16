@@ -67,7 +67,8 @@ local defaults = {
       "blank",
       "2lines",
       "grid",
-      "bubbles"
+      "bubbles",
+      "sun"
     },
     onSet = function(value)
       app.UIThread.setScreenSaver(value)
