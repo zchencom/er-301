@@ -232,39 +232,14 @@ bool draw( _NT_algorithm* self )
 	_sunsAlgorithm* a = (_sunsAlgorithm*)self;
 	float t = a->time;
 
-	memset( a->buf->canvas, 0, sizeof(a->buf->canvas) );
-
-	float cx[3], cy[3], r[3];
-	for ( int n = 0; n < 3; ++n )
-	{
-		const SunPath& p = kPaths[n];
-		float ang = TWO_PI * ( t / p.period + p.offset );
-		cx[n] = 128.0f + p.ax * sinf( ang );
-		cy[n] = 21.0f + p.ay * sinf( p.yRatio * ang );
-		r[n] = p.radius * ( 1.0f + 0.12f * sinf( TWO_PI * t / ( 7.0f + n ) ) );
-		drawSun( a, cx[n], cy[n], r[n], TWO_PI * t / p.rayPeriod );
-	}
-	drawFloor( a, cx, cy, r );
-
-	// keep the reflection faint under the caption so the text stays readable
-	for ( int y = HORIZON + 3; y < SCREEN_H; ++y )
-		for ( int x = 0; x < SCREEN_W; ++x )
-			a->buf->canvas[ y * SCREEN_W + x ] /= 3;
-
-	// copy to the screen through the documented drawing call
-	for ( int y = 0; y < SCREEN_H; ++y )
-	{
-		const uint8_t* row = &a->buf->canvas[ y * SCREEN_W ];
-		for ( int x = 0; x < SCREEN_W; ++x )
-		{
-			if ( row[x] )
-				NT_drawShapeI( kNT_point, x, y, x, y, row[x] );
-		}
-	}
-
-	// caption on the floor, two lines so it fits whatever the font width
-	NT_drawText( SCREEN_W / 2, 53, CAPTION_1, 15, kNT_textCentre, kNT_textNormal );
-	NT_drawText( SCREEN_W / 2, 62, CAPTION_2, 15, kNT_textCentre, kNT_textNormal );
+	// text only. It drifts by a couple of pixels over several minutes so the
+	// same pixels are not lit for hours (OLED burn-in).
+	float fx = 3.0f * sinf( TWO_PI * t / 300.0f );
+	float fy = 2.0f * sinf( TWO_PI * t / 420.0f + 1.0f );
+	int dx = fx >= 0.0f ? (int)( fx + 0.5f ) : (int)( fx - 0.5f );
+	int dy = fy >= 0.0f ? (int)( fy + 0.5f ) : (int)( fy - 0.5f );
+	NT_drawText( SCREEN_W / 2 + dx, 30 + dy, CAPTION_1, 15, kNT_textCentre, kNT_textNormal );
+	NT_drawText( SCREEN_W / 2 + dx, 42 + dy, CAPTION_2, 15, kNT_textCentre, kNT_textNormal );
 
 	return true;   // full screen: hide the standard parameter line
 }
