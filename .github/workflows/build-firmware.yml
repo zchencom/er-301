@@ -12,7 +12,7 @@ env:
   # NOTE: no extra "-" after the stolmine version. The ER-301 package manager
   # takes everything before the last two "-" as the package name, so an extra
   # "-suffix" turns "core" into "core-0.7.0" and breaks package updates.
-  OUR_TAG: v0.7.0-stolmine.9.7.0.sun6
+  OUR_TAG: v0.7.0-stolmine.9.7.0.sun7
 
 permissions:
   contents: write   # lets the workflow publish the firmware as a GitHub release
