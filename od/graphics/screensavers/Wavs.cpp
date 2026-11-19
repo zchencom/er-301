@@ -31,7 +31,6 @@ namespace od
       {"f14260096.wav", 14260096UL, 5.0f},
       {"f14862016.wav", 14862016UL, 3.1f},
   };
-  static const unsigned long kCardSectors = 15523840UL; // 7948 MB card
   static const float kGap = 3.0f;                         // pause after a pass
 
   Wavs::Wavs()
@@ -49,14 +48,19 @@ namespace od
     mCurrent = 0;
     mPause = 0.0f;
     mDrift = 0.0f;
-    for (int i = 0; i < 13; i++)
-      mFade[i] = 0.0f;
+    mScroll = 0.0f;
   }
 
-  static void fmtTime(char *buf, int len, float s)
+  // deterministic pseudo-random value in [0,1) for (seed, i)
+  static float hash01(unsigned seed, int i)
   {
-    int t = (int)s;
-    snprintf(buf, len, "%d:%02d", t / 60, t % 60);
+    unsigned h = seed * 0x45d9f3bu + (unsigned)i * 0x27d4eb2du;
+    h ^= h >> 15;
+    h *= 0x2c1b3c6du;
+    h ^= h >> 12;
+    h *= 0x297a2d39u;
+    h ^= h >> 15;
+    return (float)(h & 0xffffff) / 16777216.0f;
   }
 
   void Wavs::draw(FrameBuffer &m, FrameBuffer &s)
@@ -64,12 +68,6 @@ namespace od
     const float dt = GRAPHICS_REFRESH_PERIOD;
 
     // ---- advance the silent playhead ----
-    for (int i = 0; i < 13; i++)
-    {
-      mFade[i] -= dt / 4.0f; // afterglow lasts ~4 s
-      if (mFade[i] < 0.0f)
-        mFade[i] = 0.0f;
-    }
     if (mPause > 0.0f)
     {
       mPause -= dt;
@@ -79,7 +77,6 @@ namespace od
       mTime += dt;
       if (mTime >= kWavs[mCurrent].seconds)
       {
-        mFade[mCurrent] = 1.0f;
         mTime = 0.0f;
         mCurrent++;
         if (mCurrent >= 13)
@@ -91,7 +88,7 @@ namespace od
     }
     bool playing = mPause <= 0.0f;
 
-    // ---- main display: the folder, 3 columns x 5 rows ----
+    // ---- main display: the folder, 3 columns x 5 rows; only the current one lit ----
     mDrift += dt;
     int dx = (int)lroundf(3.0f * sinf(mDrift * 0.021f));
     int dy = (int)lroundf(2.0f * sinf(mDrift * 0.017f + 1.0f));
@@ -99,58 +96,34 @@ namespace od
     for (int i = 0; i < 13; i++)
     {
       int col = i % 3, row = i / 3;
-      int x = colX[col] + dx;
-      int y = 52 - row * 12 + dy; // baseline, y = 0 is the bottom
-      int c = GRAY3;
-      int fade = (int)(mFade[i] * 8.0f);
-      if (GRAY3 + fade > c)
-        c = GRAY3 + fade;
-      if (playing && i == mCurrent)
-        c = WHITE;
-      m.text(c, x, y, kWavs[i].name, 10);
-      if (playing && i == mCurrent)
+      int c = (playing && i == mCurrent) ? WHITE : GRAY3;
+      m.text(c, colX[col] + dx, 52 - row * 12 + dy, kWavs[i].name, 10);
+    }
+
+    // ---- sub display (1-bit): a waveform, drawn like an audio editor ----
+    mScroll += dt * 30.0f; // pixels per second
+    if (mScroll > 1000000.0f)
+      mScroll -= 1000000.0f;
+    int off = (int)mScroll;
+    unsigned seed = (unsigned)kWavs[mCurrent].sector;
+    for (int x = 0; x < 128; x++)
+    {
+      int a = 0;
+      if (playing)
       {
-        // progress line under the name
-        int w = (int)(76.0f * mTime / kWavs[i].seconds);
-        m.hline(GRAY5, x, x + 76, y - 3, 2);
-        if (w > 0)
-          m.hline(GRAY12, x, x + w, y - 3);
+        int u = x + off;
+        // slow envelope: smooth value noise, ~24 px per bump
+        int k = u / 24;
+        float f = (float)(u % 24) / 24.0f;
+        f = f * f * (3.0f - 2.0f * f);
+        float e0 = hash01(seed, k), e1 = hash01(seed, k + 1);
+        float env = e0 + (e1 - e0) * f;
+        env = env * env;
+        // fast detail, different on every column
+        float fine = 0.35f + 0.65f * hash01(seed ^ 0x9e3779b9u, u);
+        a = (int)(28.0f * env * fine);
       }
-    }
-
-    // ---- sub display (1-bit): the file now, and where it lay ----
-    const WavFile &f = kWavs[mCurrent];
-    char buf[40];
-    if (playing)
-    {
-      int w = (int)strlen(f.name) * 7; // consolas 12 is 7 px per character
-      s.text(WHITE, 64 - w / 2, 48, f.name, 12);
-    }
-    else
-    {
-      s.text(WHITE, 64 - 9 * 7 / 2, 48, "13 sounds", 12);
-    }
-
-    snprintf(buf, sizeof(buf), "sector %lu", f.sector);
-    s.text(WHITE, 4, 38, buf, 8);
-    unsigned long mb = (unsigned long)((f.sector * 512.0) / 1000000.0 + 0.5);
-    snprintf(buf, sizeof(buf), "%lu MB into the card", mb);
-    s.text(WHITE, 4, 29, buf, 8);
-
-    // elapsed / length
-    char a[12], b[12];
-    fmtTime(a, sizeof(a), playing ? mTime : 0.0f);
-    fmtTime(b, sizeof(b), f.seconds);
-    snprintf(buf, sizeof(buf), "%s / %s", a, b);
-    s.text(WHITE, 4, 18, buf, 8);
-
-    // map of the card: a line, a tick for every file, a tall one for this one
-    s.hline(WHITE, 4, 123, 6, 2);
-    for (int i = 0; i < 13; i++)
-    {
-      int x = 4 + (int)(119.0f * (float)kWavs[i].sector / (float)kCardSectors);
-      int h = (i == mCurrent && playing) ? 5 : 2;
-      s.vline(WHITE, x, 6, 6 + h);
+      s.vline(WHITE, x, 32 - a, 32 + a);
     }
   }
 
