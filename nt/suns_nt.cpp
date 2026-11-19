@@ -18,6 +18,8 @@
 #define SCREEN_W 256
 #define SCREEN_H 64
 #define HORIZON 42            // y of the horizon line
+#define CAPTION_1 "beigedarren"
+#define CAPTION_2 "Liverpool, United Kingdom"
 #define SPRITE 28             // half-size of the area drawn around each sun
 #define SPRITE_W (2 * SPRITE + 1)
 #define TWO_PI 6.28318530718f
@@ -244,6 +246,11 @@ bool draw( _NT_algorithm* self )
 	}
 	drawFloor( a, cx, cy, r );
 
+	// keep the reflection faint under the caption so the text stays readable
+	for ( int y = HORIZON + 3; y < SCREEN_H; ++y )
+		for ( int x = 0; x < SCREEN_W; ++x )
+			a->buf->canvas[ y * SCREEN_W + x ] /= 3;
+
 	// copy to the screen through the documented drawing call
 	for ( int y = 0; y < SCREEN_H; ++y )
 	{
@@ -254,6 +261,10 @@ bool draw( _NT_algorithm* self )
 				NT_drawShapeI( kNT_point, x, y, x, y, row[x] );
 		}
 	}
+
+	// caption on the floor, two lines so it fits whatever the font width
+	NT_drawText( SCREEN_W / 2, 53, CAPTION_1, 15, kNT_textCentre, kNT_textNormal );
+	NT_drawText( SCREEN_W / 2, 62, CAPTION_2, 15, kNT_textCentre, kNT_textNormal );
 
 	return true;   // full screen: hide the standard parameter line
 }
