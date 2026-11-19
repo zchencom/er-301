@@ -88,7 +88,7 @@ namespace od
     }
     bool playing = mPause <= 0.0f;
 
-    // ---- main display: the folder, 3 columns x 5 rows; only the current one lit ----
+    // ---- main display: the folder, 3 columns x 5 rows, all lit ----
     mDrift += dt;
     int dx = (int)lroundf(3.0f * sinf(mDrift * 0.021f));
     int dy = (int)lroundf(2.0f * sinf(mDrift * 0.017f + 1.0f));
@@ -96,7 +96,7 @@ namespace od
     for (int i = 0; i < 13; i++)
     {
       int col = i % 3, row = i / 3;
-      int c = (playing && i == mCurrent) ? WHITE : GRAY3;
+      int c = WHITE;
       m.text(c, colX[col] + dx, 52 - row * 12 + dy, kWavs[i].name, 10);
     }
 
